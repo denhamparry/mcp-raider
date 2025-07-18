@@ -31,6 +31,110 @@ server.tool("get_raider_status", "Get the status of Raider", async ({}) => {
   };
 });
 
+// This is a tool to get process IDs by searching for multiple strings
+// PROMPT: What are the process IDs for processes containing "node" and "mcp-weather"?
+server.tool(
+  "get_process_id",
+  "Get process IDs by searching for multiple strings in process list",
+  {
+    searchStrings: z
+      .array(z.string())
+      .describe(
+        "Array of strings to grep for in process list (e.g., ['node', 'mcp-weather'])"
+      ),
+  },
+  async ({ searchStrings }) => {
+    try {
+      // Build the grep command chain
+      const grepChain = searchStrings.map((str) => `grep ${str}`).join(" | ");
+      const psCommand = `ps auxww | ${grepChain}`;
+
+      // Execute the ps command to find matching processes
+      const { stdout: psOutput } = await execAsync(psCommand);
+
+      if (!psOutput.trim()) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "No processes found matching the search criteria",
+            },
+          ],
+        };
+      }
+
+      // Parse each process line and extract information
+      const lines = psOutput.trim().split("\n");
+      const processes = lines.map((line, index) => {
+        const columns = line.trim().split(/\s+/);
+        const user = columns[0];
+        const pid = columns[1];
+        const cpu = columns[2];
+        const mem = columns[3];
+        const vsz = columns[4];
+        const rss = columns[5];
+        const tty = columns[6];
+        const stat = columns[7];
+        const started = columns[8];
+        const time = columns[9];
+        const command = columns.slice(10).join(" ");
+
+        return {
+          index: index + 1,
+          user,
+          pid,
+          cpu,
+          mem,
+          vsz,
+          rss,
+          tty,
+          stat,
+          started,
+          time,
+          command,
+        };
+      });
+
+      // Format the output for display
+      const processInfo = processes
+        .map(
+          (proc) =>
+            `Process ${proc.index}:
+  PID: ${proc.pid}
+  User: ${proc.user}
+  CPU: ${proc.cpu}%
+  Memory: ${proc.mem}%
+  Status: ${proc.stat}
+  Started: ${proc.started}
+  Time: ${proc.time}
+  Command: ${proc.command}
+  ---`
+        )
+        .join("\n");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Found ${processes.length} matching process(es):\n\n${processInfo}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error searching for processes: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          },
+        ],
+      };
+    }
+  }
+);
+
 // This is a tool to get the environment variables of a process.
 // PROMPT: What are the environment variables of the process running "node" and "mcp-weather"?
 server.tool(

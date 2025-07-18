@@ -1,11 +1,11 @@
 # DEV
 
-## Step 1
+## Step 1 - return process id
 
-I want to amend the `get_environment_variables` within index.ts.
+I want to create a the `get_process_id` toolwithin index.ts.
 
-I'm working on a debugging tool that will allow me to get the environment
-variables of a process on the same machine that the mcp is running on. I want to
+I'm working on a debugging tool that will allow me to get the process id of
+applications running on the same machine that the mcp is running on. I want to
 pass an array of strings to grep processes on the machine. Using this example
 below, I want to grep `node` and `mcp-weather` and return the process id of the
 process that matches the strings.
@@ -13,14 +13,19 @@ process that matches the strings.
 <!-- markdownlint-disable MD013 -->
 
 ```sh
-ps auxww | grep node | grep mcp-weather
+ps auxww | grep mcp-weather
 lewis            23164   0.0  0.3 412869136  67040   ??  S     9:10a.m.   0:00.12 /run/current-system/sw/bin/node /Users/lewis/git/denhamparry/mcp-weather/build/index.js
 ```
 
 <!-- markdownlint-enable MD013 -->
 
-Once I have the process id, I want to get the environment variables of the
-process.
+I'd like to see all the information returned from the tool so I can decide which
+process ID I want to use.
+
+## Step 2 - get environment variables from process id
+
+I want to amend the `get_environment_variables` within index.ts. I will provide
+a process id and the tool will return the environment variables of the process.
 
 <!-- markdownlint-disable MD013 -->
 
@@ -34,7 +39,7 @@ ps eww -p 23164
 
 I want to return the environment variables in a structured format.
 
-## Step 2 - rewrite the mcp-weather application
+## Step 3 - rewrite the mcp-weather application
 
 I want to amend the `make_it_warmer` tool to allow the user to specify the
 temperature increase.

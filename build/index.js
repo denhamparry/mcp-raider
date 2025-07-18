@@ -122,52 +122,20 @@ server.tool(
     }
   }
 );
-// This is a tool to get the environment variables of a process.
-// PROMPT: What are the environment variables of the process running "node" and "mcp-weather"?
+// This is a tool to get the environment variables of a process by PID.
+// PROMPT: What are the environment variables of process 23164?
 server.tool(
   "get_environment_variables",
-  "Get the environment variables of a process by searching for multiple strings",
+  "Get the environment variables of a process by process ID",
   {
-    searchStrings: z
-      .array(z.string())
-      .describe(
-        "Array of strings to grep for in process list (e.g., ['node', 'mcp-weather'])"
-      ),
+    processId: z
+      .string()
+      .describe("Process ID to get environment variables for"),
   },
-  async ({ searchStrings }) => {
+  async ({ processId }) => {
     try {
-      // Build the grep command chain
-      const grepChain = searchStrings.map((str) => `grep ${str}`).join(" | ");
-      const psCommand = `ps auxww | ${grepChain}`;
-      // Execute the ps command to find matching processes
-      const { stdout: psOutput } = await execAsync(psCommand);
-      if (!psOutput.trim()) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "No processes found matching the search criteria",
-            },
-          ],
-        };
-      }
-      // Extract process ID from the first matching process
-      const lines = psOutput.trim().split("\n");
-      const firstLine = lines[0];
-      const columns = firstLine.trim().split(/\s+/);
-      const pid = columns[1];
-      if (!pid) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Could not extract process ID from grep results",
-            },
-          ],
-        };
-      }
       // Get environment variables using ps eww
-      const { stdout: envOutput } = await execAsync(`ps eww -p ${pid}`);
+      const { stdout: envOutput } = await execAsync(`ps eww -p ${processId}`);
       // Parse the environment variables
       const envLines = envOutput.trim().split("\n");
       if (envLines.length < 2) {
@@ -175,40 +143,37 @@ server.tool(
           content: [
             {
               type: "text",
-              text: "Could not retrieve environment variables",
+              text: `Could not retrieve environment variables for process ${processId}. Process may not exist.`,
             },
           ],
         };
       }
       // Extract environment variables from the command line
       const commandLine = envLines[1];
-      const envVarMatch = commandLine.match(/\s([A-Z_][A-Z0-9_]*=\S+)/g);
-      if (!envVarMatch) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "No environment variables found in process output",
-            },
-          ],
-        };
-      }
-      // Parse environment variables into structured format
+      // Split the command line to separate command from environment variables
+      // Environment variables appear after the command and are in KEY=VALUE format
+      const parts = commandLine.split(/\s+/);
       const envVars = {};
-      envVarMatch.forEach((match) => {
-        const trimmed = match.trim();
-        const [key, ...valueParts] = trimmed.split("=");
-        envVars[key] = valueParts.join("=");
+      // Look for environment variables in the format KEY=VALUE
+      parts.forEach((part) => {
+        if (part.includes("=") && /^[A-Z_][A-Z0-9_]*=/.test(part)) {
+          const [key, ...valueParts] = part.split("=");
+          envVars[key] = valueParts.join("=");
+        }
       });
+      // Also get basic process info from the first line
+      const headerLine = envLines[0];
+      const processInfo = envLines[1];
       return {
         content: [
           {
             type: "text",
             text: JSON.stringify(
               {
-                processId: pid,
+                processId: processId,
                 environmentVariables: envVars,
-                processInfo: firstLine,
+                processInfo: processInfo,
+                totalEnvVars: Object.keys(envVars).length,
               },
               null,
               2
@@ -221,7 +186,7 @@ server.tool(
         content: [
           {
             type: "text",
-            text: `Error retrieving environment variables: ${
+            text: `Error retrieving environment variables for process ${processId}: ${
               error instanceof Error ? error.message : String(error)
             }`,
           },

@@ -39,21 +39,21 @@ ps eww -p 23164
 
 I want to return the environment variables in a structured format.
 
-## Step 3 - rewrite the mcp-weather application
+## Step 3 - rewrite a node JS application
 
-I want to amend the `make_it_warmer` tool to allow the user to specify the
-temperature increase.
+I want to create a server tool called `luck_about_and_find_out_variables_names`
+that will return to me a list of variables from a node js file . The user will
+provide the file name and the tool will return a list of variables that it can
+amend.
 
-From the previous step, we can see location of the application file:
+## Step 4 - rewrite a node JS application
 
-`/Users/lewis/git/denhamparry/mcp-weather/build/index.js`
+I want to create a server tool called `luck_about_and_find_out_variables_values`
+that will take a file name, a variable name, and a value from the user. The tool
+will then modify the file and set the variable to the value provided by the
+user.
 
-Can we rewrite the application to adjust line 151 within the `index.js` file:
+## Step 5 - kill a process id
 
-```js
-forecast.main.temp;
-```
-
-to increase the temperature by the desired amount from the input? We want to
-make sure that people think that the temperature is 10 degrees warmer than it
-actually is.
+I want to create a server tool called `luck_about_and_find_out_process_kill`
+that will take a process id from the user and kill the process.

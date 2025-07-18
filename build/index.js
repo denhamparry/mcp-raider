@@ -195,6 +195,8 @@ server.tool(
     }
   }
 );
+// PROMPT: I'd like to luck about and find out the variable names for the file
+// /Users/lewis/git/denhamparry/mcp-weather/build/index.js
 server.tool(
   "luck_about_and_find_out_variables_names",
   "Get a list of variables from a Node.js file that can be modified",
@@ -270,6 +272,104 @@ server.tool(
           {
             type: "text",
             text: `Error analyzing file ${fileName}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          },
+        ],
+      };
+    }
+  }
+);
+server.tool(
+  "luck_about_and_find_out_variables_values",
+  "Modify a variable in a Node.js file by setting it to a new value",
+  {
+    fileName: z.string().describe("The file name/path to modify"),
+    variableName: z.string().describe("The variable name to modify"),
+    value: z.string().describe("The new value to set for the variable"),
+  },
+  async ({ fileName, variableName, value }) => {
+    try {
+      // Read the current file content
+      const { stdout: fileContent } = await execAsync(`cat "${fileName}"`);
+      const lines = fileContent.split("\n");
+      let modificationCount = 0;
+      // Process each line to find and replace the variable
+      const updatedLines = lines.map((line, index) => {
+        const trimmedLine = line.trim();
+        // Skip comments and empty lines
+        if (
+          trimmedLine.startsWith("//") ||
+          trimmedLine.startsWith("/*") ||
+          !trimmedLine
+        ) {
+          return line;
+        }
+        // Match variable declarations: const/let/var variableName = value
+        const declareRegex = new RegExp(
+          `((?:const|let|var)\\s+${variableName.replace(
+            /[.*+?^${}()|[\]\\]/g,
+            "\\$&"
+          )}\\s*=\\s*)[^;\\n]+`
+        );
+        if (declareRegex.test(line)) {
+          modificationCount++;
+          return line.replace(declareRegex, `$1${value}`);
+        }
+        // Match property assignments: object.property = value
+        const propRegex = new RegExp(
+          `(${variableName.replace(
+            /[.*+?^${}()|[\]\\]/g,
+            "\\$&"
+          )}\\s*=\\s*)[^;\\n]+`
+        );
+        if (propRegex.test(line)) {
+          modificationCount++;
+          return line.replace(propRegex, `$1${value}`);
+        }
+        // Match simple assignments: variableName = value
+        const assignRegex = new RegExp(
+          `^(\\s*${variableName.replace(
+            /[.*+?^${}()|[\]\\]/g,
+            "\\$&"
+          )}\\s*=\\s*)[^;\\n]+`
+        );
+        if (assignRegex.test(line)) {
+          modificationCount++;
+          return line.replace(assignRegex, `$1${value}`);
+        }
+        // Match function parameters and object properties with values
+        const functionRegex = new RegExp(
+          `(${variableName.replace(
+            /[.*+?^${}()|[\]\\]/g,
+            "\\$&"
+          )}\\s*:\\s*)[0-9.-]+`
+        );
+        if (functionRegex.test(line)) {
+          modificationCount++;
+          return line.replace(functionRegex, `$1${value}`);
+        }
+        return line;
+      });
+      const updatedContent = updatedLines.join("\n");
+      // Write the updated content back to the file
+      await execAsync(`cat > "${fileName}" << 'EOF'
+${updatedContent}
+EOF`);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Successfully updated ${fileName}. Modified ${modificationCount} occurrence(s) of variable '${variableName}' to value '${value}'.`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error modifying file ${fileName}: ${
               error instanceof Error ? error.message : String(error)
             }`,
           },

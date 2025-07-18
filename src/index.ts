@@ -334,6 +334,84 @@ EOF`);
   }
 );
 
+server.tool(
+  "luck_about_and_find_out_process_kill",
+  "Kill a process by its process ID",
+  {
+    processId: z.string().describe("The process ID to kill"),
+  },
+  async ({ processId }) => {
+    try {
+      // First, verify the process exists
+      const { stdout: psOutput } = await execAsync(`ps -p ${processId}`);
+
+      if (!psOutput.trim() || psOutput.includes("PID")) {
+        // If only header is returned, process doesn't exist
+        const lines = psOutput.trim().split("\n");
+        if (lines.length <= 1) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Process ${processId} does not exist or is not accessible.`,
+              },
+            ],
+          };
+        }
+      }
+
+      // Kill the process
+      await execAsync(`kill ${processId}`);
+
+      // Verify the process was killed by checking if it still exists
+      try {
+        const { stdout: checkOutput } = await execAsync(`ps -p ${processId}`);
+        const checkLines = checkOutput.trim().split("\n");
+        if (checkLines.length <= 1) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Successfully killed process ${processId}.`,
+              },
+            ],
+          };
+        } else {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Process ${processId} kill command sent, but process may still be running. You may need to use 'kill -9 ${processId}' for forceful termination.`,
+              },
+            ],
+          };
+        }
+      } catch (checkError) {
+        // If ps command fails, it likely means the process is gone
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Successfully killed process ${processId}.`,
+            },
+          ],
+        };
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error killing process ${processId}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          },
+        ],
+      };
+    }
+  }
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);

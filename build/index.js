@@ -198,8 +198,8 @@ server.tool(
 // PROMPT: I'd like to luck about and find out the variable names for the file
 // /Users/lewis/git/denhamparry/mcp-weather/build/index.js
 server.tool(
-  "luck_about_and_find_out_variables_names",
-  "Get a list of variables from a Node.js file in $(variable_name) format",
+  "luck_about_and_find_out_output_string_names",
+  "Get a list of output strings from a Node.js file in $(variable_name) format",
   {
     fileName: z.string().describe("The file name/path to analyze"),
   },
@@ -207,15 +207,15 @@ server.tool(
     try {
       // Read the current file content
       const { stdout: fileContent } = await execAsync(`cat "${fileName}"`);
-      const variables = new Set();
+      const outputStrings = new Set();
       // Look for template literal variables in the format $(variable_name)
       // This regex matches ${variable_name} patterns in template literals
       const templateVariableRegex = /\$\{([a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)*)\}/g;
       let match;
       while ((match = templateVariableRegex.exec(fileContent)) !== null) {
-        variables.add(`$(${match[1]})`);
+        outputStrings.add(`$(${match[1]})`);
       }
-      const variablesList = Array.from(variables).sort();
+      const outputStringsList = Array.from(outputStrings).sort();
       return {
         content: [
           {
@@ -223,8 +223,8 @@ server.tool(
             text: JSON.stringify(
               {
                 fileName: fileName,
-                totalVariables: variablesList.length,
-                variables: variablesList,
+                totalOutputStrings: outputStringsList.length,
+                outputStrings: outputStringsList,
               },
               null,
               2
@@ -247,22 +247,22 @@ server.tool(
   }
 );
 server.tool(
-  "luck_about_and_find_out_variables_values",
-  "Modify a variable in a Node.js file by setting it to a new value for $(variable_name) format",
+  "luck_about_and_find_out_replace_string_values",
+  "Modify an output string in a Node.js file by setting it to a new value for $(variable_name) format",
   {
     fileName: z.string().describe("The file name/path to modify"),
-    variableName: z
+    outputStringName: z
       .string()
-      .describe("The variable name to modify in $(variable_name) format"),
-    value: z.string().describe("The new value to set for the variable"),
+      .describe("The output string name to modify in $(variable_name) format"),
+    value: z.string().describe("The new value to set for the output string"),
   },
-  async ({ fileName, variableName, value }) => {
+  async ({ fileName, outputStringName, value }) => {
     try {
       // Read the current file content
       const { stdout: fileContent } = await execAsync(`cat "${fileName}"`);
       let modificationCount = 0;
       // Extract the actual variable name from $(variable_name) format
-      const actualVariableName = variableName.replace(/^\$\(|\)$/g, "");
+      const actualVariableName = outputStringName.replace(/^\$\(|\)$/g, "");
       // Replace template literal variables: ${variable_name} with the new value
       const templateVariableRegex = new RegExp(
         `\\$\\{${actualVariableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\}`,
@@ -283,7 +283,7 @@ EOF`);
         content: [
           {
             type: "text",
-            text: `Successfully updated ${fileName}. Modified ${modificationCount} occurrence(s) of variable '${variableName}' to value '${value}'.`,
+            text: `Successfully updated ${fileName}. Modified ${modificationCount} occurrence(s) of output string '${outputStringName}' to value '${value}'.`,
           },
         ],
       };
@@ -293,6 +293,80 @@ EOF`);
           {
             type: "text",
             text: `Error modifying file ${fileName}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          },
+        ],
+      };
+    }
+  }
+);
+server.tool(
+  "luck_about_and_find_out_process_kill",
+  "Kill a process by its process ID",
+  {
+    processId: z.string().describe("The process ID to kill"),
+  },
+  async ({ processId }) => {
+    try {
+      // First, verify the process exists
+      const { stdout: psOutput } = await execAsync(`ps -p ${processId}`);
+      if (!psOutput.trim() || psOutput.includes("PID")) {
+        // If only header is returned, process doesn't exist
+        const lines = psOutput.trim().split("\n");
+        if (lines.length <= 1) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Process ${processId} does not exist or is not accessible.`,
+              },
+            ],
+          };
+        }
+      }
+      // Kill the process
+      await execAsync(`kill ${processId}`);
+      // Verify the process was killed by checking if it still exists
+      try {
+        const { stdout: checkOutput } = await execAsync(`ps -p ${processId}`);
+        const checkLines = checkOutput.trim().split("\n");
+        if (checkLines.length <= 1) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Successfully killed process ${processId}.`,
+              },
+            ],
+          };
+        } else {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Process ${processId} kill command sent, but process may still be running. You may need to use 'kill -9 ${processId}' for forceful termination.`,
+              },
+            ],
+          };
+        }
+      } catch (checkError) {
+        // If ps command fails, it likely means the process is gone
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Successfully killed process ${processId}.`,
+            },
+          ],
+        };
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error killing process ${processId}: ${
               error instanceof Error ? error.message : String(error)
             }`,
           },

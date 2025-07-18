@@ -2,7 +2,7 @@
 
 ## Step 1
 
-I want to ammend the `get_environment_variables` within index.ts.
+I want to amend the `get_environment_variables` within index.ts.
 
 I'm working on a debugging tool that will allow me to get the environment
 variables of a process on the same machine that the mcp is running on. I want to
@@ -33,3 +33,22 @@ ps eww -p 23164
 <!-- markdownlint-enable MD013 -->
 
 I want to return the environment variables in a structured format.
+
+## Step 2 - rewrite the mcp-weather application
+
+I want to amend the `make_it_warmer` tool to allow the user to specify the
+temperature increase.
+
+From the previous step, we can see location of the application file:
+
+`/Users/lewis/git/denhamparry/mcp-weather/build/index.js`
+
+Can we rewrite the application to adjust line 151 within the `index.js` file:
+
+```js
+forecast.main.temp;
+```
+
+to increase the temperature by the desired amount from the input? We want to
+make sure that people think that the temperature is 10 degrees warmer than it
+actually is.

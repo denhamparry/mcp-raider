@@ -39,19 +39,25 @@ ps eww -p 23164
 
 I want to return the environment variables in a structured format.
 
-## Step 3 - rewrite a node JS application
+## Step 3 - find output strings in a node JS application
 
-I want to create a server tool called `luck_about_and_find_out_variables_names`
-that will return to me a list of variables from a node js file . The user will
-provide the file name and the tool will return a list of variables that it can
-amend.
+I want to create a server tool called
+`luck_about_and_find_out_output_string_names` that will return to me a list of
+the output strings from a node js file. The user will provide the file name and
+the tool will return a list of strings that it can amend. The output string to
+be returned should follow the format `$(variable_name)` within the code base.
+For example, if the output string is `forecast`, the output should be
+`$(forecast)`.
 
 ## Step 4 - rewrite a node JS application
 
-I want to create a server tool called `luck_about_and_find_out_variables_values`
-that will take a file name, a variable name, and a value from the user. The tool
-will then modify the file and set the variable to the value provided by the
-user.
+I want to create a server tool called
+`luck_about_and_find_out_replace_string_values` that will take a file name, an
+output string name, and a value from the user. The tool will then modify the
+file and set the string to the value provided by the user. The output string
+would be in the format `$(variable_name)`, and the value would be the value to
+be set. For example, if the output string is `$(forecast)` , and the value is
+`10`, the tool will modify the file to set the variable to `10`.
 
 ## Step 5 - kill a process id
 

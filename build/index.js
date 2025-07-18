@@ -199,7 +199,7 @@ server.tool(
 // /Users/lewis/git/denhamparry/mcp-weather/build/index.js
 server.tool(
   "luck_about_and_find_out_variables_names",
-  "Get a list of variables from a Node.js file that can be modified",
+  "Get a list of variables from a Node.js file in $(variable_name) format",
   {
     fileName: z.string().describe("The file name/path to analyze"),
   },
@@ -208,47 +208,13 @@ server.tool(
       // Read the current file content
       const { stdout: fileContent } = await execAsync(`cat "${fileName}"`);
       const variables = new Set();
-      const lines = fileContent.split("\n");
-      // Look for variable declarations and assignments
-      lines.forEach((line, index) => {
-        const trimmedLine = line.trim();
-        // Skip comments and empty lines
-        if (
-          trimmedLine.startsWith("//") ||
-          trimmedLine.startsWith("/*") ||
-          !trimmedLine
-        ) {
-          return;
-        }
-        // Match variable declarations: const/let/var variableName = value
-        const declareMatch = trimmedLine.match(
-          /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/
-        );
-        if (declareMatch) {
-          variables.add(declareMatch[1]);
-        }
-        // Match property assignments: object.property = value
-        const propMatch = trimmedLine.match(
-          /([a-zA-Z_$][a-zA-Z0-9_$]*\.[a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/
-        );
-        if (propMatch) {
-          variables.add(propMatch[1]);
-        }
-        // Match simple assignments: variableName = value
-        const assignMatch = trimmedLine.match(
-          /^\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/
-        );
-        if (assignMatch && !declareMatch) {
-          variables.add(assignMatch[1]);
-        }
-        // Match function parameters and object properties with values
-        const functionMatch = trimmedLine.match(
-          /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*[0-9]/
-        );
-        if (functionMatch) {
-          variables.add(functionMatch[1]);
-        }
-      });
+      // Look for template literal variables in the format $(variable_name)
+      // This regex matches ${variable_name} patterns in template literals
+      const templateVariableRegex = /\$\{([a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)*)\}/g;
+      let match;
+      while ((match = templateVariableRegex.exec(fileContent)) !== null) {
+        variables.add(`$(${match[1]})`);
+      }
       const variablesList = Array.from(variables).sort();
       return {
         content: [
@@ -282,76 +248,33 @@ server.tool(
 );
 server.tool(
   "luck_about_and_find_out_variables_values",
-  "Modify a variable in a Node.js file by setting it to a new value",
+  "Modify a variable in a Node.js file by setting it to a new value for $(variable_name) format",
   {
     fileName: z.string().describe("The file name/path to modify"),
-    variableName: z.string().describe("The variable name to modify"),
+    variableName: z
+      .string()
+      .describe("The variable name to modify in $(variable_name) format"),
     value: z.string().describe("The new value to set for the variable"),
   },
   async ({ fileName, variableName, value }) => {
     try {
       // Read the current file content
       const { stdout: fileContent } = await execAsync(`cat "${fileName}"`);
-      const lines = fileContent.split("\n");
       let modificationCount = 0;
-      // Process each line to find and replace the variable
-      const updatedLines = lines.map((line, index) => {
-        const trimmedLine = line.trim();
-        // Skip comments and empty lines
-        if (
-          trimmedLine.startsWith("//") ||
-          trimmedLine.startsWith("/*") ||
-          !trimmedLine
-        ) {
-          return line;
-        }
-        // Match variable declarations: const/let/var variableName = value
-        const declareRegex = new RegExp(
-          `((?:const|let|var)\\s+${variableName.replace(
-            /[.*+?^${}()|[\]\\]/g,
-            "\\$&"
-          )}\\s*=\\s*)[^;\\n]+`
-        );
-        if (declareRegex.test(line)) {
+      // Extract the actual variable name from $(variable_name) format
+      const actualVariableName = variableName.replace(/^\$\(|\)$/g, "");
+      // Replace template literal variables: ${variable_name} with the new value
+      const templateVariableRegex = new RegExp(
+        `\\$\\{${actualVariableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\}`,
+        "g"
+      );
+      const updatedContent = fileContent.replace(
+        templateVariableRegex,
+        (match) => {
           modificationCount++;
-          return line.replace(declareRegex, `$1${value}`);
+          return value;
         }
-        // Match property assignments: object.property = value
-        const propRegex = new RegExp(
-          `(${variableName.replace(
-            /[.*+?^${}()|[\]\\]/g,
-            "\\$&"
-          )}\\s*=\\s*)[^;\\n]+`
-        );
-        if (propRegex.test(line)) {
-          modificationCount++;
-          return line.replace(propRegex, `$1${value}`);
-        }
-        // Match simple assignments: variableName = value
-        const assignRegex = new RegExp(
-          `^(\\s*${variableName.replace(
-            /[.*+?^${}()|[\]\\]/g,
-            "\\$&"
-          )}\\s*=\\s*)[^;\\n]+`
-        );
-        if (assignRegex.test(line)) {
-          modificationCount++;
-          return line.replace(assignRegex, `$1${value}`);
-        }
-        // Match function parameters and object properties with values
-        const functionRegex = new RegExp(
-          `(${variableName.replace(
-            /[.*+?^${}()|[\]\\]/g,
-            "\\$&"
-          )}\\s*:\\s*)[0-9.-]+`
-        );
-        if (functionRegex.test(line)) {
-          modificationCount++;
-          return line.replace(functionRegex, `$1${value}`);
-        }
-        return line;
-      });
-      const updatedContent = updatedLines.join("\n");
+      );
       // Write the updated content back to the file
       await execAsync(`cat > "${fileName}" << 'EOF'
 ${updatedContent}

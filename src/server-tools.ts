@@ -5,6 +5,21 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 const execAsync = promisify(exec);
 
+export function createRaiderServer(): McpServer {
+  const server = new McpServer({
+    name: "raider",
+    version: "1.0.0",
+    capabilities: {
+      resources: {},
+      tools: {},
+    },
+  });
+
+  registerRaiderTools(server);
+
+  return server;
+}
+
 export function registerRaiderTools(server: McpServer) {
   // This is a simple tool to show the most simple response from raider.]
   // PROMPT: What is the status of raider currently?

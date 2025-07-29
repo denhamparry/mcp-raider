@@ -1,19 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { registerRaiderTools } from "./server-tools.js";
+import { createRaiderServer } from "./server-tools.js";
 
 // Create server instance
-const server = new McpServer({
-  name: "raider",
-  version: "1.0.0",
-  capabilities: {
-    resources: {},
-    tools: {},
-  },
-});
-
-// Register raider tools
-registerRaiderTools(server);
+const server = createRaiderServer();
 
 async function main() {
   const transport = new StdioServerTransport();

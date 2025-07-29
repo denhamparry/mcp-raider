@@ -150,43 +150,94 @@ export function registerRaiderTools(server: McpServer) {
     },
     async ({ processId }) => {
       try {
-        // Get environment variables using /proc/PID/environ
-        const { stdout: envOutput } = await execAsync(
-          `cat /proc/${processId}/environ`
-        );
+        // Check if we're on macOS
+        const { stdout: osType } = await execAsync("uname");
+        const isMacOS = osType.trim() === "Darwin";
 
-        // Parse the environment variables
-        // The environ file contains null-separated KEY=VALUE pairs
         const envVars: Record<string, string> = {};
-
-        // Split by null character and filter out empty strings
-        const envPairs = envOutput
-          .split("\0")
-          .filter((pair) => pair.length > 0);
-
-        // Parse each environment variable
-        envPairs.forEach((pair) => {
-          const equalIndex = pair.indexOf("=");
-          if (equalIndex > 0) {
-            const key = pair.substring(0, equalIndex);
-            const value = pair.substring(equalIndex + 1);
-            envVars[key] = value;
-          }
-        });
-
-        // Get process info for context using /proc/PID/cmdline
         let processInfo = "";
-        try {
-          const { stdout: cmdline } = await execAsync(
-            `cat /proc/${processId}/cmdline`
+
+        if (isMacOS) {
+          // On macOS, use ps -E -p to get environment variables
+          const { stdout: psOutput } = await execAsync(`ps -E -p ${processId}`);
+
+          // Parse the ps output
+          const lines = psOutput.trim().split("\n");
+
+          // Skip the header line if present
+          const dataLines = lines.filter((line) => !line.includes("PID"));
+
+          if (dataLines.length === 0) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Process ${processId} not found`,
+                },
+              ],
+            };
+          }
+
+          // Extract environment variables from the output
+          // The format is typically: PID TTY TIME CMD ENV_VAR=value ENV_VAR2=value2...
+          const processLine = dataLines[0];
+
+          // Find where environment variables start (after the command)
+          // Look for the first = sign that's part of an environment variable
+          const envStartMatch = processLine.match(/\s+([A-Z_][A-Z0-9_]*=)/);
+
+          if (envStartMatch && envStartMatch.index) {
+            const envString = processLine.substring(envStartMatch.index).trim();
+
+            // Parse environment variables
+            // Match KEY=value pairs, handling values that might contain spaces
+            const envRegex = /([A-Z_][A-Z0-9_]*)=([^\s]+(?:\s+(?![A-Z_][A-Z0-9_]*=))*)/g;
+            let match;
+
+            while ((match = envRegex.exec(envString)) !== null) {
+              const key = match[1];
+              const value = match[2].trim();
+              envVars[key] = value;
+            }
+          }
+
+          // Get process info
+          processInfo = `Process ${processId} (macOS)`;
+        } else {
+          // On Linux, use /proc/PID/environ
+          const { stdout: envOutput } = await execAsync(
+            `cat /proc/${processId}/environ`
           );
-          // cmdline contains null-separated arguments, replace nulls with spaces
-          const command =
-            cmdline.replace(/\0/g, " ").trim() || "Unknown command";
-          processInfo = `PID: ${processId}, Command: ${command}`;
-        } catch {
-          // If /proc/PID/cmdline fails, just use the PID
-          processInfo = `Process ${processId}`;
+
+          // Parse the environment variables
+          // The environ file contains null-separated KEY=VALUE pairs
+          const envPairs = envOutput
+            .split("\0")
+            .filter((pair) => pair.length > 0);
+
+          // Parse each environment variable
+          envPairs.forEach((pair) => {
+            const equalIndex = pair.indexOf("=");
+            if (equalIndex > 0) {
+              const key = pair.substring(0, equalIndex);
+              const value = pair.substring(equalIndex + 1);
+              envVars[key] = value;
+            }
+          });
+
+          // Get process info for context using /proc/PID/cmdline
+          try {
+            const { stdout: cmdline } = await execAsync(
+              `cat /proc/${processId}/cmdline`
+            );
+            // cmdline contains null-separated arguments, replace nulls with spaces
+            const command =
+              cmdline.replace(/\0/g, " ").trim() || "Unknown command";
+            processInfo = `PID: ${processId}, Command: ${command}`;
+          } catch {
+            // If /proc/PID/cmdline fails, just use the PID
+            processInfo = `Process ${processId}`;
+          }
         }
 
         return {
@@ -199,6 +250,7 @@ export function registerRaiderTools(server: McpServer) {
                   environmentVariables: envVars,
                   processInfo: processInfo,
                   totalEnvVars: Object.keys(envVars).length,
+                  platform: isMacOS ? "macOS" : "Linux",
                 },
                 null,
                 2

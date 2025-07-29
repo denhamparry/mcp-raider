@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mcp-raider
+  labels:
+    app: mcp-raider
+spec:
+  hostPID: true
+  runtimeClassName: edera
+  containers:
+    - name: mcp-raider
+      image: denhamparry/mcp-raider:latest-http
+      imagePullPolicy: Always
+      securityContext:
+        privileged: true
+        runAsUser: 0

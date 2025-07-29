@@ -147,41 +147,41 @@ server.tool(
   },
   async ({ processId }) => {
     try {
-      // Get environment variables using ps eww
-      const { stdout: envOutput } = await execAsync(`ps eww -p ${processId}`);
+      // Get environment variables using /proc/PID/environ
+      const { stdout: envOutput } = await execAsync(
+        `cat /proc/${processId}/environ`
+      );
 
       // Parse the environment variables
-      const envLines = envOutput.trim().split("\n");
-      if (envLines.length < 2) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Could not retrieve environment variables for process ${processId}. Process may not exist.`,
-            },
-          ],
-        };
-      }
-
-      // Extract environment variables from the command line
-      const commandLine = envLines[1];
-
-      // Split the command line to separate command from environment variables
-      // Environment variables appear after the command and are in KEY=VALUE format
-      const parts = commandLine.split(/\s+/);
+      // The environ file contains null-separated KEY=VALUE pairs
       const envVars: Record<string, string> = {};
 
-      // Look for environment variables in the format KEY=VALUE
-      parts.forEach((part) => {
-        if (part.includes("=") && /^[A-Z_][A-Z0-9_]*=/.test(part)) {
-          const [key, ...valueParts] = part.split("=");
-          envVars[key] = valueParts.join("=");
+      // Split by null character and filter out empty strings
+      const envPairs = envOutput.split("\0").filter((pair) => pair.length > 0);
+
+      // Parse each environment variable
+      envPairs.forEach((pair) => {
+        const equalIndex = pair.indexOf("=");
+        if (equalIndex > 0) {
+          const key = pair.substring(0, equalIndex);
+          const value = pair.substring(equalIndex + 1);
+          envVars[key] = value;
         }
       });
 
-      // Also get basic process info from the first line
-      const headerLine = envLines[0];
-      const processInfo = envLines[1];
+      // Get process info for context using /proc/PID/cmdline
+      let processInfo = "";
+      try {
+        const { stdout: cmdline } = await execAsync(
+          `cat /proc/${processId}/cmdline`
+        );
+        // cmdline contains null-separated arguments, replace nulls with spaces
+        const command = cmdline.replace(/\0/g, " ").trim() || "Unknown command";
+        processInfo = `PID: ${processId}, Command: ${command}`;
+      } catch {
+        // If /proc/PID/cmdline fails, just use the PID
+        processInfo = `Process ${processId}`;
+      }
 
       return {
         content: [

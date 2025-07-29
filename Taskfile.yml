@@ -1,0 +1,40 @@
+version: "3"
+
+env:
+  DOCKER_REGISTRY: '{{.DOCKER_REGISTRY | default "docker.io"}}'
+  IMAGE_NAME: mcp-raider
+  IMAGE_TAG: '{{.IMAGE_TAG | default "latest"}}'
+
+tasks:
+  build:
+    desc: Build Docker image
+    cmds:
+      - docker build -t {{.DOCKER_REGISTRY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}} .
+
+  push:
+    desc: Push Docker image to registry
+    deps: [build]
+    cmds:
+      - docker push {{.DOCKER_REGISTRY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}}
+
+  run:
+    desc: Run Docker container
+    cmds:
+      - docker run -it --rm {{.DOCKER_REGISTRY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}}
+
+  run-local:
+    desc: Run Docker container with local development settings
+    cmds:
+      - docker run -it --rm --network host -v $(pwd):/workspace
+        {{.DOCKER_REGISTRY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}}
+
+  shell:
+    desc: Run Docker container with shell for debugging
+    cmds:
+      - docker run -it --rm --entrypoint /bin/sh
+        {{.DOCKER_REGISTRY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}}
+
+  clean:
+    desc: Remove Docker image
+    cmds:
+      - docker rmi {{.DOCKER_REGISTRY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}} || true

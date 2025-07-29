@@ -39,4 +39,4 @@ RUN addgroup -g 1001 -S nodejs && \
 USER nodejs
 
 # MCP servers typically run on stdio, so we use ENTRYPOINT
-ENTRYPOINT ["node", "./build/index.js"]
+ENTRYPOINT ["node", "./build/http.js"]

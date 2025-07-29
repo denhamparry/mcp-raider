@@ -78,6 +78,12 @@ tasks:
       - kubectl apply -f kubernetes/pod.yaml
       - kubectl apply -f kubernetes/service.yaml
 
+  kubernetes-apply-edera:
+    desc: Spin up MCP on a Kubernetes Cluster with Edera runtime
+    cmds:
+      - kubectl apply -f kubernetes/pod-edera.yaml
+      - kubectl apply -f kubernetes/service.yaml
+
   kubernetes-port-forward:
     desc: Connect to the remote MCP server
     cmds:

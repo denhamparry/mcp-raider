@@ -1,40 +1,89 @@
 version: "3"
 
-env:
-  DOCKER_REGISTRY: '{{.DOCKER_REGISTRY | default "docker.io"}}'
+vars:
   IMAGE_NAME: mcp-raider
-  IMAGE_TAG: '{{.IMAGE_TAG | default "latest"}}'
+  IMAGE_TAG: latest
+  REGISTRY: docker.io
+  REGISTRY_USER: '{{.REGISTRY_USER | default "denhamparry"}}'
 
 tasks:
   build:
-    desc: Build Docker image
+    desc: Build the project
     cmds:
-      - docker build -t {{.DOCKER_REGISTRY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}} .
+      - npm install && npm run build
+    silent: false
 
-  push:
-    desc: Push Docker image to registry
+  run-stdio:
+    desc: Run the project as a standard MCP server
     deps: [build]
     cmds:
-      - docker push {{.DOCKER_REGISTRY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}}
+      - node build/index.js
+    silent: false
 
-  run:
-    desc: Run Docker container
+  run-http:
+    desc: Run the project as an HTTP server
+    deps: [build]
     cmds:
-      - docker run -it --rm {{.DOCKER_REGISTRY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}}
+      - node build/http.js
+    silent: false
 
-  run-local:
-    desc: Run Docker container with local development settings
+  docker-build:
+    desc: Build the Docker images
     cmds:
-      - docker run -it --rm --network host -v $(pwd):/workspace
-        {{.DOCKER_REGISTRY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}}
+      - docker buildx build --platform linux/amd64,linux/arm64 -f
+        docker/Dockerfile.stdio
+        -t  {{.REGISTRY}}/{{.REGISTRY_USER}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}}-stdio
+        --push .
+      - docker buildx build --platform linux/amd64,linux/arm64 -f
+        docker/Dockerfile.http
+        -t  {{.REGISTRY}}/{{.REGISTRY_USER}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}}-http
+        --push .
+    silent: false
+    preconditions:
+      - sh: '[ -n "$REGISTRY_USER" ]'
+        msg: "Please set REGISTRY_USER environment variable"
 
-  shell:
-    desc: Run Docker container with shell for debugging
+  docker-run-stdio:
+    desc: Run the Docker container with stdio transport support
     cmds:
-      - docker run -it --rm --entrypoint /bin/sh
-        {{.DOCKER_REGISTRY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}}
+      - docker run -it --rm --name {{.IMAGE_NAME}}-stdio -d
+        {{.REGISTRY}}/{{.REGISTRY_USER}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}}
+    silent: false
+    preconditions:
+      - sh: '[ -n "$OPENWEATHER_API_KEY" ]'
+        msg: "Please set OPENWEATHER_API_KEY environment variable"
 
-  clean:
-    desc: Remove Docker image
+  docker-run-http:
+    desc: Run the Docker container with streamable HTTP transport support
     cmds:
-      - docker rmi {{.DOCKER_REGISTRY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}} || true
+      - docker run -it --rm --name {{.IMAGE_NAME}}-http -d -p 3000:3000
+        {{.REGISTRY}}/{{.REGISTRY_USER}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}}-http
+    silent: false
+
+  docker-stop-stdio:
+    desc: Stop the Docker container with stdio transport support
+    cmds:
+      - docker stop {{.IMAGE_NAME}}-stdio
+    silent: false
+
+  docker-stop-http:
+    desc: Stop the Docker container with streamable HTTP transport support
+    cmds:
+      - docker stop {{.IMAGE_NAME}}-http
+    silent: false
+
+  kubernetes-apply:
+    desc: Spin up MCP on a Kubernetes Cluster
+    cmds:
+      - kubectl apply -f kubernetes/pod.yaml
+      - kubectl apply -f kubernetes/service.yaml
+
+  kubernetes-port-forward:
+    desc: Connect to the remote MCP server
+    cmds:
+      - kubectl port-forward svc/mcp-raider 3001:3001
+
+  kubernetes-delete:
+    desc: Delete MCP from a Kubernetes Cluster
+    cmds:
+      - kubectl delete -f kubernetes/
